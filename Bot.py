@@ -656,7 +656,7 @@ async def cmd_nap(update, ctx):
 async def cmd_info(update, ctx):
     user = update.effective_user
     ok, info = check_user(user.id)
-    role = "👑 ADMIN" if is_admin(user.id) else "👤 USER"
+    role = "👑 ADMIN" if not is_admin(user.id): else "👤 USER"
 
     if not ok and info is None:
         text = (
