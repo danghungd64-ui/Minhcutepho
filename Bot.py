@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # ============================================================
-#   LEMINH TOOL MD5 - VIP 2026 - v12 FINAL
-#   Thuật toán SIÊU CẤP + % TIN CẬY
+#   LEMINH TOOL 
+#   CHÀO MỪNG BẠN ĐẾN VỚI TOOL LE MINH
 # ============================================================
 import os
 import re
@@ -41,8 +41,8 @@ BANK_NAME = "MBBANK"
 BANK_ACC = "0372834763"
 BANK_OWNER = "LE MINH"
 
-SECRET_TOKEN = "LEMINH_TOOL_VIP_2026_V12_KEY"
-SECRET_SALT = "LM12X9K8M7N6P5Q4W3E2R1Z0"
+SECRET_TOKEN = "LEMINH_TOOL_VIP_V13_KEY"
+SECRET_SALT = "LM13X9K8M7N6P5Q4W3E2R1Z0"
 
 DATA_DIR = "/data"
 if not os.path.exists(DATA_DIR):
@@ -141,9 +141,68 @@ def md5_custom(message):
 
 
 # ============================================================
-#   THUẬT TOÁN v12 - 128 VÒNG, 15 LỚP MIX
-#   + TÍNH % TIN CẬY
+#   THUẬT TOÁN TOÁN HỌC v13
+#   + Hàm băm mở rộng
+#   + Ma trận 4x4 xoay vòng
+#   + Dãy Fibonacci mod 100
+#   + Số nguyên tố + logarit tự nhiên
+#   + Hàm sigmoid để chuẩn hoá
 # ============================================================
+
+def prime_sieve(n):
+    """Sàng số nguyên tố"""
+    sieve = [True] * (n + 1)
+    sieve[0] = sieve[1] = False
+    for i in range(2, int(n ** 0.5) + 1):
+        if sieve[i]:
+            for j in range(i * i, n + 1, i):
+                sieve[j] = False
+    return [i for i, is_p in enumerate(sieve) if is_p]
+
+# Sinh sẵn 1000 số nguyên tố đầu
+PRIMES = prime_sieve(8000)[:1000]
+
+
+def fibonacci_mod(n, m=100):
+    """Dãy Fibonacci mod m"""
+    a, b = 0, 1
+    for _ in range(n % 300):
+        a, b = b, (a + b) % m
+    return a
+
+
+def matrix_rotate_4x4(matrix):
+    """Xoay ma trận 4x4 90 độ"""
+    return [[matrix[3-j][i] for j in range(4)] for i in range(4)]
+
+
+def matrix_mult_4x4(A, B):
+    """Nhân 2 ma trận 4x4 mod 256"""
+    return [[sum(A[i][k] * B[k][j] for k in range(4)) % 256 for j in range(4)] for i in range(4)]
+
+
+def bytes_to_matrix_4x4(data):
+    """Chuyển 16 bytes thành ma trận 4x4"""
+    return [[data[i * 4 + j] for j in range(4)] for i in range(4)]
+
+
+def matrix_to_bytes_4x4(matrix):
+    """Chuyển ma trận 4x4 thành 16 bytes"""
+    out = bytearray()
+    for row in matrix:
+        for val in row:
+            out.append(val % 256)
+    return bytes(out)
+
+
+def sigmoid(x):
+    """Hàm sigmoid"""
+    try:
+        return 1 / (1 + math.exp(-x))
+    except OverflowError:
+        return 0.0 if x < 0 else 1.0
+
+
 def detect_hash_type(h):
     h = h.strip()
     if re.fullmatch(r"[a-fA-F0-9]{32}", h):
@@ -160,7 +219,7 @@ def predict(h):
         return {"error": True}
 
     # ============================================
-    # LỚP 1: Tạo 8 nguồn entropy
+    # BƯỚC 1: Tạo entropy đa tầng
     # ============================================
     md5_c = md5_custom(h.encode())
     sha3_256 = hashlib.sha3_256(h.encode()).hexdigest()
@@ -169,26 +228,23 @@ def predict(h):
     blake2s = hashlib.blake2s(h.encode()).hexdigest()
     weight = 47 if htype == "MD5" else 59
 
-    salt1 = "LM12_ALPHA_X9"
+    salt1 = "LM13_A"
     salt2 = "SEED_" + str(len(h)) + "_" + str(weight)
-    salt3 = "X9K2M7P4Q1Z8W5Y3"
+    salt3 = "X9K2M7P4Q1"
     salt4 = "R_" + md5_c[:14]
-    salt5 = "ZK3L8N5W2Y7M4Q9P6"
+    salt5 = "ZK3L8N5W2Y7"
     salt6 = SECRET_SALT
-    salt7 = "OMEGA_" + sha3_256[:10] + blake2b[:10]
+    salt7 = "OMEGA_" + sha3_256[:10]
     salt8 = "FINAL_" + blake2s[:12]
 
     # ============================================
-    # LỚP 2: Trộn tất cả
+    # BƯỚC 2: Trộn + Băm 128 vòng
     # ============================================
     mixed = (h + "::" + SECRET_TOKEN + "::" + md5_c + "::" + sha3_256
              + "::" + sha3_512 + "::" + blake2b + "::" + blake2s
              + "::" + salt1 + "::" + salt2 + "::" + salt3 + "::" + salt4
              + "::" + salt5 + "::" + salt6 + "::" + salt7 + "::" + salt8).encode()
 
-    # ============================================
-    # LỚP 3: Băm 128 vòng × 6 hash
-    # ============================================
     for i in range(128):
         r = i % 6
         if r == 0:
@@ -205,7 +261,7 @@ def predict(h):
             mixed = hashlib.blake2s(mixed + str(i).encode() + salt6.encode()).digest()
 
     # ============================================
-    # LỚP 4: Avalanche 8 lần
+    # BƯỚC 3: AVALANCHE 8 lần
     # ============================================
     avalanche_configs = [
         (13, 0xA5A5A5A5A5A5A5A5), (7, 0x5A5A5A5A5A5A5A5A),
@@ -220,7 +276,21 @@ def predict(h):
         mixed = b.to_bytes(8, "big") + mixed[8:]
 
     # ============================================
-    # LỚP 5: Khuếch tán phi tuyến 6 lớp
+    # BƯỚC 4: MA TRẬN 4x4 XOAY VÒNG (TOÁN HỌC)
+    # ============================================
+    for block_start in range(0, min(64, len(mixed) - 16), 16):
+        block = mixed[block_start:block_start + 16]
+        if len(block) < 16:
+            break
+        mat = bytes_to_matrix_4x4(block)
+        # Xoay 4 lần + nhân chính nó
+        for _ in range(4):
+            mat = matrix_rotate_4x4(mat)
+        mat2 = matrix_mult_4x4(mat, mat)
+        mixed = mixed[:block_start] + matrix_to_bytes_4x4(mat2) + mixed[block_start + 16:]
+
+    # ============================================
+    # BƯỚC 5: KHUẾCH TÁN PHI TUYẾN 6 LỚP
     # ============================================
     score = 0
     raw_score = 0
@@ -230,24 +300,52 @@ def predict(h):
             cb += b"\x00" * (4 - len(cb))
         ck = int.from_bytes(cb, "big")
 
-        # Lớp A: bình phương mod 9973
         score = (score * weight + (ck * ck) % 9973 + ck) % 100
-        # Lớp B: XOR mod 97
         score = (score ^ (ck % 97)) % 100
-        # Lớp C: nghịch đảo mod 89
         inv = pow(ck % 89 + 1, 87, 89)
         score = (score + inv) % 100
-        # Lớp D: nghịch đảo mod 101
         inv2 = pow(ck % 101 + 1, 99, 101)
         score = (score * inv2 + 7) % 100
-        # Lớp E: nghịch đảo mod 103
         inv3 = pow(ck % 103 + 1, 101, 103)
         score = (score + inv3 * 3) % 100
-        # Lớp F: raw_score để tính tin cậy
         raw_score = (raw_score + ck) % 1000000
 
     # ============================================
-    # LỚP 6: Bit-mix 5 nguồn
+    # BƯỚC 6: SỐ NGUYÊN TỐ + FIBONACCI + LOGARIT (TOÁN HỌC)
+    # ============================================
+    # Chọn 4 số nguyên tố từ entropy
+    p1 = PRIMES[(raw_score) % 1000]
+    p2 = PRIMES[(raw_score >> 4) % 1000]
+    p3 = PRIMES[(raw_score >> 8) % 1000]
+    p4 = PRIMES[(raw_score >> 12) % 1000]
+
+    # Công thức toán học
+    prime_score = (p1 * 7 + p2 * 11 + p3 * 13 + p4 * 17) % 100
+    score = (score + prime_score) % 100
+
+    # Fibonacci
+    fib_n = raw_score % 300
+    fib_val = fibonacci_mod(fib_n, 100)
+    score = (score + fib_val) % 100
+
+    # Logarit tự nhiên
+    try:
+        log_val = int(abs(math.log(abs(score) + 1)) * 1000) % 100
+        score = (score + log_val) % 100
+    except Exception:
+        pass
+
+    # Căn bậc 2
+    sqrt_val = int(math.sqrt(raw_score + 1) * 100) % 100
+    score = (score + sqrt_val) % 100
+
+    # Lượng giác
+    sin_val = int(abs(math.sin(score / 10.0)) * 1000) % 100
+    cos_val = int(abs(math.cos(raw_score / 1000.0)) * 1000) % 100
+    score = (score + sin_val + cos_val) % 100
+
+    # ============================================
+    # BƯỚC 7: BIT-MIX 5 NGUỒN
     # ============================================
     fm1 = int.from_bytes(hashlib.sha256(mixed).digest()[:8], "big")
     fm2 = int.from_bytes(hashlib.sha3_256(mixed).digest()[:8], "big")
@@ -262,16 +360,13 @@ def predict(h):
     score = (score * 67 + fm5) % 100
 
     # ============================================
-    # LỚP 7: Modular kép
+    # BƯỚC 8: MODULAR + XÁO TRỘN
     # ============================================
     score = (score * 101 + 43) % 100
     score = (score ^ 0x5A) % 100
     score = (score + (weight * 7)) % 100
     score = (score * 131 + 17) % 100
 
-    # ============================================
-    # LỚP 8: Xáo trộn bit
-    # ============================================
     sb = score & 0x7F
     score = ((sb << 1) | (sb >> 6)) & 0x7F
     if score >= 100:
@@ -280,36 +375,25 @@ def predict(h):
     score = abs(score) % 100
 
     # ============================================
-    # TÍNH % TIN CẬY (50% - 95%)
-    # Dựa trên: độ lệch score khỏi 50 + entropy
+    # BƯỚC 9: TÍNH % TIN CẬY (sigmoid + math)
     # ============================================
     distance = abs(score - 50)  # 0..50
 
-    # Base tin cậy từ distance
-    if distance >= 40:
-        base_conf = 90 + (distance - 40)      # 90..100
-    elif distance >= 30:
-        base_conf = 82 + (distance - 30)      # 82..90
-    elif distance >= 22:
-        base_conf = 72 + (distance - 22)      # 72..82
-    elif distance >= 15:
-        base_conf = 62 + (distance - 15)      # 62..72
-    elif distance >= 8:
-        base_conf = 54 + (distance - 8)       # 54..62
-    else:
-        base_conf = 50 + distance             # 50..58
+    # Sigmoid cho tin cậy
+    sig = sigmoid((distance - 15) / 5.0)  # 0..1
+    confidence = 50 + int(sig * 45)        # 50..95
 
-    # Điều chỉnh theo entropy của raw_score
-    entropy_factor = (raw_score % 7) - 3      # -3..+3
-    confidence = base_conf + entropy_factor
+    # Điều chỉnh entropy ±3
+    entropy_factor = (raw_score % 7) - 3
+    confidence = confidence + entropy_factor
 
+    # Đảm bảo trong khoảng
     confidence = max(50, min(int(confidence), 95))
 
     # ============================================
-    # XỬ LÝ KẾT QUẢ
+    # KẾT QUẢ
     # ============================================
-    # Nếu score gần 50 và tin cậy thấp → có thể báo "CHƯA RÕ"
-    if confidence < 55 and 45 <= score <= 55:
+    if 45 <= score <= 55 and confidence < 55:
         result = "CHƯA RÕ"
     else:
         result = "XỈU" if score < 50 else "TÀI"
@@ -414,9 +498,8 @@ def is_admin(user_id):
 # ============================================================
 async def send_locked_message(update_or_msg, is_callback=False):
     text = (
-        "╔═══════════════════════╗\n"
-        "   🔒 <b>KEY ĐÃ HẾT HẠN</b>\n"
-        "╚═══════════════════════╝\n\n"
+        "🔒 <b>KEY ĐÃ HẾT HẠN</b>\n"
+        + LINE + "\n\n"
         "⚠️ Thời gian sử dụng đã kết thúc!\n\n"
         "📋 Để tiếp tục:\n"
         "1️⃣ Gõ /nap xem bảng giá\n"
@@ -435,7 +518,7 @@ async def send_locked_message(update_or_msg, is_callback=False):
         "📞 Zalo: <code>" + ADMIN_PHONE + "</code>"
     )
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("💳 MUA KEY NGAY", callback_data="nap")],
+        [InlineKeyboardButton("💳 MUA KEY", callback_data="nap")],
         [InlineKeyboardButton("🔑 NHẬP KEY", callback_data="huongdan_key")],
         [InlineKeyboardButton("💬 ZALO ADMIN", url="https://zalo.me/" + ADMIN_PHONE)],
     ])
@@ -447,9 +530,8 @@ async def send_locked_message(update_or_msg, is_callback=False):
 
 async def send_no_key_message(update_or_msg, is_callback=False):
     text = (
-        "╔═══════════════════════╗\n"
-        "   🔒 <b>CHƯA KÍCH HOẠT KEY</b>\n"
-        "╚═══════════════════════╝\n\n"
+        "🔒 <b>CHƯA KÍCH HOẠT KEY</b>\n"
+        + LINE + "\n\n"
         "⚠️ Cần có key VIP để sử dụng!\n\n"
         "📋 Các bước:\n"
         "1️⃣ Gõ /nap xem bảng giá\n"
@@ -468,7 +550,7 @@ async def send_no_key_message(update_or_msg, is_callback=False):
         "📞 Zalo: <code>" + ADMIN_PHONE + "</code>"
     )
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("💳 MUA KEY NGAY", callback_data="nap")],
+        [InlineKeyboardButton("💳 MUA KEY", callback_data="nap")],
         [InlineKeyboardButton("🔑 NHẬP KEY", callback_data="huongdan_key")],
         [InlineKeyboardButton("💬 ZALO ADMIN", url="https://zalo.me/" + ADMIN_PHONE)],
     ])
@@ -492,34 +574,29 @@ async def start(update, ctx):
 
     is_vip, info = check_user(user.id)
     if is_admin(user.id):
-        status = "👑 ADMIN (Không giới hạn)"
+        status = "👑 ADMIN"
     elif is_vip:
-        status = "✅ VIP - Còn: <b>" + get_remaining(info.get("expires", -1)) + "</b>"
+        status = "✅ VIP - " + get_remaining(info.get("expires", -1))
     elif info is not None:
         status = "🔴 <b>KEY ĐÃ HẾT HẠN</b>"
     else:
-        status = "❌ Chưa kích hoạt - Gõ /key"
+        status = "❌ Chưa kích hoạt"
 
     text = (
-        "╔═══════════════════════╗\n"
-        "   🎯 <b>LEMINH TOOL VIP v12</b>\n"
-        "   Thuật toán SIÊU CẤP 🔥\n"
-        "   Dự đoán + % Tin Cậy\n"
-        "╚═══════════════════════╝\n\n"
-        "📥 <b>GỬI MD5 / SHA-256</b>\n"
-        "├ MD5: 32 ký tự hex\n"
-        "├ SHA-256: 64 ký tự hex\n"
-        "└ Bot tự nhận diện ✨\n\n"
+        "🎯 <b>LEMINH TOOL VIP v13</b>\n"
+        "Dự đoán TÀI / XỈU chuẩn xác\n"
+        + LINE + "\n\n"
+        "📥 <b>Gửi MD5 (32) / SHA-256 (64)</b>\n"
+        "→ Bot tự nhận diện + dự đoán\n\n"
         + LINE + "\n"
-        "🔑 <b>Trạng thái:</b>\n"
-        "   " + status + "\n"
+        "🔑 <b>Trạng thái:</b> " + status + "\n"
         + LINE + "\n"
-        "📋 <b>LỆNH:</b>\n"
-        "┌ /key – Kích hoạt key\n"
-        "├ /nap – Nạp tiền mua key\n"
-        "├ /info – Thông tin VIP\n"
-        "├ /hotro – Liên hệ admin\n"
-        "└ /xoa – Xoá tin nhắn bot"
+        "📋 <b>Lệnh:</b>\n"
+        "/key – Kích hoạt key\n"
+        "/nap – Nạp tiền mua key\n"
+        "/info – Thông tin VIP\n"
+        "/hotro – Liên hệ admin\n"
+        "/xoa – Xoá tin nhắn bot"
     )
     await update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
@@ -528,22 +605,19 @@ async def cmd_key(update, ctx):
     args = ctx.args
     if not args:
         text = (
-            "🔑 <b>KÍCH HOẠT KEY</b>\n"
-            + LINE + "\n\n"
-            "📝 <code>/key MÃ_KEY_CỦA_BẠN</code>\n\n"
+            "🔑 <b>KÍCH HOẠT KEY</b>\n" + LINE + "\n\n"
+            "📝 <code>/key MÃ_KEY</code>\n\n"
             "💡 Ví dụ:\n"
             "<code>/key LM-ABCD1234XYZ</code>\n\n"
-            "📞 Chưa có key? /nap để mua"
+            "📞 /nap để mua key"
         )
         await update.message.reply_text(text, parse_mode=ParseMode.HTML)
         return
-
     key = args[0].strip().upper()
     ok, result = activate_key(update.effective_user.id, key)
     if ok:
         text = (
-            "✅ <b>KÍCH HOẠT THÀNH CÔNG!</b>\n"
-            + LINE + "\n"
+            "✅ <b>KÍCH HOẠT THÀNH CÔNG!</b>\n" + LINE + "\n"
             "🔑 Key: <code>" + esc(key) + "</code>\n"
             "🎁 Loại: <b>" + result["label"] + "</b>\n"
             + LINE + "\n"
@@ -556,26 +630,22 @@ async def cmd_key(update, ctx):
 
 async def cmd_nap(update, ctx):
     text = (
-        "╔═══════════════════════╗\n"
-        "   💳 <b>NẠP TIỀN MUA KEY</b>\n"
-        "╚═══════════════════════╝\n\n"
+        "💳 <b>NẠP TIỀN MUA KEY</b>\n"
+        + LINE + "\n"
         "🏦 <b>Ngân hàng:</b> " + BANK_NAME + "\n"
         "💳 <b>Số TK:</b> <code>" + BANK_ACC + "</code>\n"
         "👤 <b>Chủ TK:</b> " + BANK_OWNER + "\n"
         "📝 <b>Nội dung:</b> SĐT Telegram\n\n"
         + LINE + "\n"
         "💎 <b>BẢNG GIÁ:</b>\n"
-        "┌────────────┬──────────┐\n"
-        "│ 1 Giờ      │  3.000đ  │\n"
-        "│ 1 Ngày     │ 10.000đ  │\n"
-        "│ 4 Ngày     │ 30.000đ  │\n"
-        "│ 1 Tuần     │ 50.000đ  │\n"
-        "│ 1 Tháng    │ 80.000đ  │\n"
-        "│ Vĩnh viễn  │  Liên hệ │\n"
-        "└────────────┴──────────┘\n\n"
+        "├ 1 Giờ      → 3.000đ\n"
+        "├ 1 Ngày     → 10.000đ\n"
+        "├ 4 Ngày     → 30.000đ\n"
+        "├ 1 Tuần     → 50.000đ\n"
+        "├ 1 Tháng    → 80.000đ\n"
+        "└ Vĩnh viễn  → Liên hệ\n"
         + LINE + "\n"
-        "📞 Gửi bill cho admin:\n"
-        "• Zalo: <code>" + ADMIN_PHONE + "</code>"
+        "📞 Gửi bill: <code>" + ADMIN_PHONE + "</code>"
     )
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("💬 Zalo Admin", url="https://zalo.me/" + ADMIN_PHONE)],
@@ -627,8 +697,8 @@ async def cmd_hotro(update, ctx):
         "📞 <b>LIÊN HỆ ADMIN</b>\n" + LINE + "\n"
         "• Zalo: <code>" + ADMIN_PHONE + "</code>\n"
         "• SĐT: <code>" + ADMIN_PHONE + "</code>\n\n"
-        "💳 Nạp tiền: /nap\n"
-        "🔑 Kích hoạt: /key"
+        "💳 /nap – Mua key\n"
+        "🔑 /key – Kích hoạt"
     )
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("💬 Zalo Admin", url="https://zalo.me/" + ADMIN_PHONE)],
@@ -686,7 +756,7 @@ async def cmd_myid(update, ctx):
 
 
 # ============================================================
-#   HANDLE HASH - TỰ ĐỘNG + HIỆN % TIN CẬY
+#   HANDLE HASH - GỌN GÀNG
 # ============================================================
 async def handle_hash(update, ctx):
     user = update.effective_user
@@ -712,14 +782,13 @@ async def handle_hash(update, ctx):
     if res.get("error"):
         msg = (
             "❌ <b>SAI ĐỊNH DẠNG!</b>\n" + LINE + "\n"
-            "• MD5: đúng <b>32</b> ký tự hex\n"
-            "• SHA-256: đúng <b>64</b> ký tự hex\n\n"
-            "👉 Gõ /32kitu hoặc /64kitu"
+            "• MD5: 32 ký tự hex\n"
+            "• SHA-256: 64 ký tự hex\n\n"
+            "👉 /32kitu hoặc /64kitu"
         )
         await update.message.reply_text(msg, parse_mode=ParseMode.HTML)
         return
 
-    # Icon theo kết quả
     if res["result"] == "TÀI":
         emoji = "🔴"
     elif res["result"] == "XỈU":
@@ -727,48 +796,25 @@ async def handle_hash(update, ctx):
     else:
         emoji = "⚪"
 
-    # Đánh giá tin cậy
-    conf = res["confidence"]
-    if conf >= 85:
-        level = "🔥 CỰC CAO"
-    elif conf >= 75:
-        level = "🔥 CAO"
-    elif conf >= 65:
-        level = "⚡ TRUNG BÌNH"
-    elif conf >= 55:
-        level = "💧 THẤP"
-    else:
-        level = "❄️ RẤT THẤP"
-
-    # Progress bar tin cậy
-    filled = int(conf / 10)
-    bar = "█" * filled + "░" * (10 - filled)
-
     is_vip, info = check_user(user.id)
     if is_admin(user.id):
-        remain_line = "👑 <b>ADMIN</b>"
+        remain_line = "👑 ADMIN"
     elif info:
         remain_line = "⏱️ Còn: <b>" + get_remaining(info.get("expires", -1)) + "</b>"
     else:
         remain_line = ""
 
     msg = (
-        "╔═══════════════════════╗\n"
-        "   🎯 <b>LEMINH VIP v12</b>\n"
-        "╚═══════════════════════╝\n"
-        "🔎 <code>" + esc(res["hash"]) + "</code>\n"
-        "🧩 Loại: <b>" + res["type"] + "</b>\n"
+        "🎯 <b>LEMINH VIP</b>\n"
         + LINE + "\n"
-        + emoji + " <b>KẾT QUẢ: " + res["result"] + "</b>\n\n"
-        + "📊 <b>DỰ ĐOÁN:</b>\n"
-        + "├ TÀI: <b>" + str(res["tai"]) + "%</b>\n"
-        + "└ XỈU: <b>" + str(res["xiu"]) + "%</b>\n\n"
-        + "🎯 <b>TIN CẬY: " + str(conf) + "%</b>\n"
-        + "└ " + bar + " " + level + "\n"
+        + "🔎 <code>" + esc(res["hash"]) + "</code>\n"
+        + "🧩 " + res["type"] + "\n\n"
+        + emoji + " <b>" + res["result"] + "</b>\n"
+        + "📊 TÀI: <b>" + str(res["tai"]) + "%</b> | XỈU: <b>" + str(res["xiu"]) + "%</b>\n"
+        + "🎯 Tin cậy: <b>" + str(res["confidence"]) + "%</b>\n"
         + LINE + "\n"
         + remain_line + "\n"
-        + "💰 Chúc bạn thắng lớn!\n"
-        + "🎯 LEMINH TOOL – Làm giàu thành công"
+        + "💰 Chúc bạn thắng lớn!"
     )
     await update.message.reply_text(msg, parse_mode=ParseMode.HTML)
 
@@ -780,11 +826,9 @@ async def cmd_admin(update, ctx):
     if not is_admin(update.effective_user.id):
         await update.message.reply_text("❌ Bạn không phải admin!")
         return
-
     users = load_db(DB_FILE)
     keys = load_db(KEYS_FILE)
     now = time.time()
-
     total_users = len(users)
     active_users = sum(1 for u in users.values() if u.get("expires", 0) == -1 or u.get("expires", 0) > now)
     expired_users = total_users - active_users
@@ -793,16 +837,13 @@ async def cmd_admin(update, ctx):
     unused_keys = total_keys - used_keys
 
     text = (
-        "╔═══════════════════════╗\n"
-        "   👑 <b>ADMIN PANEL v12</b>\n"
-        "╚═══════════════════════╝\n\n"
+        "👑 <b>ADMIN PANEL</b>\n" + LINE + "\n"
         "👥 Tổng user: <b>" + str(total_users) + "</b>\n"
         "✅ VIP hoạt động: <b>" + str(active_users) + "</b>\n"
         "🔴 Đã hết hạn: <b>" + str(expired_users) + "</b>\n"
         "🔑 Tổng key: <b>" + str(total_keys) + "</b>\n"
-        "✔️ Key đã dùng: <b>" + str(used_keys) + "</b>\n"
-        "🆓 Key chưa dùng: <b>" + str(unused_keys) + "</b>\n\n"
-        "💾 Lưu tại: <code>" + DATA_DIR + "</code>\n"
+        "✔️ Đã dùng: <b>" + str(used_keys) + "</b>\n"
+        "🆓 Chưa dùng: <b>" + str(unused_keys) + "</b>\n"
         + LINE + "\n"
         "📋 <b>LỆNH ADMIN:</b>\n"
         "├ /users – Danh sách user\n"
@@ -847,8 +888,7 @@ async def cmd_capkey(update, ctx):
     keys_created = [create_key(key_type) for _ in range(qty)]
     info = KEY_PRICING[key_type]
     text = (
-        "✅ <b>ĐÃ TẠO " + str(qty) + " KEY</b>\n"
-        + LINE + "\n"
+        "✅ <b>ĐÃ TẠO " + str(qty) + " KEY</b>\n" + LINE + "\n"
         "🎁 Loại: <b>" + info["label"] + "</b>\n"
         "💰 Giá: <b>" + "{:,}".format(info["price"]).replace(",", ".") + "đ</b>\n"
         + LINE + "\n"
@@ -869,16 +909,16 @@ async def cmd_users(update, ctx):
         await update.message.reply_text("📋 Chưa có user nào.")
         return
     now = time.time()
-    text = "👥 <b>DANH SÁCH USER</b>\n" + LINE + "\n"
-    items = sorted(users.items(), key=lambda x: x[1].get("activated", 0), reverse=True)
-    for uid, u in items[:30]:
+    text = "👥 <b>DANH SÁCH USER(</b>\n" + LINE +update "\n"
+    items = sorted(users.items(), key.e=lambda x: x[1].get("ffactivated", 0), reverse=True)
+    forective uid, u in items[:30]:
         expires = u.get("expires", 0)
         if expires == -1:
             status = "♾️ Vĩnh viễn"
         elif expires > now:
             status = "✅ " + get_remaining(expires)
         else:
-            status = "🔴 ĐÃ HẾT HẠN"
+            status = "🔴 Hết hạn"
         name = u.get("first_name", "") or u.get("username", "") or "Ẩn danh"
         key = u.get("key", "N/A")
         text += (
@@ -893,13 +933,13 @@ async def cmd_users(update, ctx):
 
 
 async def cmd_giahan(update, ctx):
-    if not is_admin(update.effective_user.id):
+    if not is_admin_user.id):
         await update.message.reply_text("❌ Bạn không phải admin!")
         return
     args = ctx.args
     if len(args) < 2:
         await update.message.reply_text(
-            "⏰ <code>/giahan [ID_user] [loại]</code>",
+            "⏰ <code>/giahan [ID] [loại]</code>",
             parse_mode=ParseMode.HTML
         )
         return
@@ -939,7 +979,7 @@ async def cmd_resetkey(update, ctx):
         return
     args = ctx.args
     if not args:
-        await update.message.reply_text("📝 /resetkey [ID_user]")
+        await update.message.reply_text("📝 /resetkey [ID]")
         return
     target_id = args[0].strip()
     users = load_db(DB_FILE)
